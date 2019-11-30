@@ -1,39 +1,167 @@
 #ifndef TYPES_HEADER
 #define TYPES_HEADER
-
+#include "dictionary.h"
+#include "includes.h"
 typedef char* string;
 struct ListNode;
 typedef struct ListNode ListNode;
-struct ListNode
-{
-	void *value;
-	struct ListNode *next;
+struct ListNode {
+    void* value;
+    struct ListNode* next;
 };
-typedef enum { BINOP, INT, CHAR, STRING, BOOL, WORD, KEYWORD } TokType;
-typedef enum { ADD, SUB, MUL, DIV, ASS/*, NEG, INV, AND, OR, NOR, XOR*/ } OpType;
+typedef struct List List;
+struct List {
+    ListNode* start;
+    ListNode* end;
+};
+typedef enum { INT, FLOAT, STRING, BOOL, CHAR } Primitives;
+typedef enum {
+    BINOP,
+    LET,
+    IF,
+    WHILE,
+    RET,
+    MET_FUN,
+    CALL,
+    DOT,
+    STRUCT,
+    UNION,
+    CLASS,
+    IND,
+    PRIMATIVE,
+    WORD,
+    KEYWORD,
+    NEW,
+    CODE
+} TokType;
+typedef enum {
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    MOD,
+    ASS,
+    EQU,
+    NEQ
+     /*, NEG, INV, AND, OR, NOR, XOR*/
+} OpType;
 struct TypedNode;
 typedef struct TypedNode TypedNode;
-typedef struct  {
-	TokType type;
-	//string text;
+struct Argument;
+typedef struct Argument Argument;
+typedef struct {
+    string c;
+    int numArgs;
+    Argument* arguments;
+} Type;
+typedef struct {
+    string str;
+    string base;
+    Type type;
+    bool structy;
+    TypedNode* typeNode;
+    int pointer;
+    int array;
+    bool fun;
+    bool met;
+} SymType;
+
+typedef struct {
+    SymType type;
+} Symbol;
+struct Argument {
+    string name;
+    SymType type;
+};
+typedef struct {
+    TokType type;
+    TypedNode* method;
+    TypedNode** arguments;
+    int numArgs;
 } CallNode;
-typedef struct  {
-	TypedNode* one;
-	OpType op;
-	TypedNode* two;
+typedef struct {
+    TypedNode* one;
+    OpType op;
+    TypedNode* two;
 } BinOpNode;
-typedef union  {
-	CallNode call;
-	BinOpNode binOp;
-	int integer;
-	float floating;
-	char character;
-	bool boolean;
-	string word;
+typedef struct {
+    string name;
+    SymType type;
+    TypedNode* value;
+} DeclareNode;
+typedef struct {
+    ListNode* start;
+} CodeNode;
+typedef struct {
+    TypedNode* condition;
+    TypedNode* body;
+    TypedNode* elseNode;
+} IfNode;
+typedef struct {
+    TypedNode* condition;
+    TypedNode* body;
+} WhileNode;
+typedef struct {
+    TypedNode* word;
+    TypedNode* collection;
+    TypedNode* body;
+} ForNode;
+typedef struct {
+    string name;
+    SymType type;
+    int numArgs;
+    Argument* arguments;
+    TypedNode* body;
+    bool fun;
+    TypedNode* parent;
+} MethodNode;
+typedef struct {
+    TypedNode* left;
+    string word;
+} AccessNode;
+typedef struct {
+    TypedNode* left;
+    TypedNode* index;
+    bool set;
+} IndexNode;
+typedef struct {
+    TokType type;
+    string name;
+    Dict* fields;
+    int fieldCount;
+} StructNode;  // <- shared with union
+typedef struct {
+    string name;
+    Argument* fields;
+} ClassNode;
+typedef union {
+    int integer;
+    float floating;
+    char character;
+    bool boolean;
+    string string;
+} PrimativeNode;
+typedef union {
+    CallNode call;
+    BinOpNode binOp;
+    CodeNode code;
+    DeclareNode declare;
+    IfNode ifOrWhile;
+    TypedNode* node;
+    MethodNode method;
+    MethodNode function;
+    StructNode structure;
+    AccessNode access;
+    IndexNode index;
+    PrimativeNode primitive;
+    string word;
 } AnyNode;
 struct TypedNode {
-	TokType type;
-	AnyNode node;
+    TokType nType;
+    Primitives pType;
+    SymType rType;
+    bool statement;
+    AnyNode node;
 };
 
 #endif

@@ -1,6 +1,8 @@
 
 #include "includes.h"
 #include "types.h"
+#include "main.h"
+#include "macros.h"
 bool valint(const string str, int *out)
 {
     char *end;
@@ -12,4 +14,16 @@ bool valint(const string str, int *out)
         *out = (int)value;
     }
     return true;
+}
+void log_lable(string file, int line) {
+    fprintf(stderr, "\033[35;1m[%s:%d]\033[0m:\t", file, line);
+}
+void hold(void) {
+    return;
+}
+List* list_new(void) {
+    List* list = new (List);
+    list->start = new (ListNode);
+    list->end = list->start;
+    return list;
 }

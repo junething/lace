@@ -1,4 +1,3 @@
 #include "includes.h"
 #include "types.h"
-ListNode* lex(char* code);
-
+ListNode *lex(FILE *input);

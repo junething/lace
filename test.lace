@@ -1,0 +1,20 @@
+
+struct Person {
+	age : int,
+	name : string,
+	met to_string (self : Person) {
+		return self.name + ": " + self.age
+	}
+
+}
+
+fun main (argc : int, argv : char**) -> int {
+let number = add ( 1 , 2 )
+let me : Person
+me.to_string()
+return 8
+}
+
+fun add (one : int, two : int) -> int {
+return one + two
+}
