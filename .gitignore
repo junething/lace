@@ -1,1 +1,11 @@
-!lacec
+lacec
+lacec.dSYM
+a.out
+.vscode
+*.dSYM
+out.c
+*.out
+lacec.lace
+testing
+*.swp
+.nfs*

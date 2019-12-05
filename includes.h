@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <wchar.h>
+#include <sys/wait.h>
 //#include <pthread.h>
 //#include <signal.h>
 //#include <netdb.h>

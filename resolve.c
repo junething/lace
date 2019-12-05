@@ -22,8 +22,8 @@ CompileContext* resolve_code(TypedNode* code) {
         primitive->str = strdup(primitives[p]);
         dict_add(c->types, primitives[p], primitive);
     }
-    string functions[] = {"fopen", "fclose", "fputs", "getline", "puts", (string)0};
-    string functionTypes[] = {"FILE", "int", "int", "ssize_t", "int"};
+    string functions[] = {"fopen", "fclose", "fputs", "getline", "puts", "printf", (string)0};
+    string functionTypes[] = {"FILE", "int", "int", "ssize_t", "int", "int"};
     for (int f = 0; functions[f] != NULL; f++) {
         SymType* function = new (SymType);
         function->type.ret = (SymType*)dict_find(c->types, functionTypes[f], NULL);
@@ -124,7 +124,7 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
                                                          "index_get", NULL);
                 node->rType = field->rType;
             } else {
-                ERROR("fadsff");
+                node->rType = node->node.index.left->rType;
             }
             break;
         case LET:

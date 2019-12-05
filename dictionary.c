@@ -54,13 +54,13 @@ void dict_new_division(Dict* dict) {
 void dict_remove_top_segment(Dict* dict) {
     LOG("removed %s", DIVISION);
     for (int i = dict->len - 1; i >= 0; i--) {
-        free(dict->array[i].key);
+        if (dict->array[i].key != NULL && !strcmp(dict->array[i].key, DIVISION)) {
+            return;
+        }
+         free(dict->array[i].key);
         //free(&dict->array[i]);
         //dict->array[i] = NULL;
         dict->len--;
-        if (!strcmp(dict->array[i].key, DIVISION)) {
-            return;
-        }
     }
 }
 void dict_add(Dict* dict, const char* key, void* value) {

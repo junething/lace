@@ -106,7 +106,7 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                 compile_node(node->node.binOp.two, c);
                 fprintf(c->dest, ")");
             } else if (node->node.binOp.op == ASS &&
-                       node->node.binOp.one->nType == IND) {
+                       node->node.binOp.one->nType == IND && node->node.binOp.one->rType.structy) {
                 compile_node(node->node.binOp.one, c);
                 // fprintf(c->dest, "(%d)\n", node->node.binOp.op);
                 compile_node(node->node.binOp.two, c);
@@ -171,7 +171,7 @@ bool compile_node(TypedNode* node, CompileContext* c) {
             else
                 fprintf(c->dest, "%s", node->node.word);
                 break;
-            case IND:
+        case IND:
             if(node->node.index.left->rType.structy) {
                 fprintf(c->dest, "%s__index_%s(",
                         node->node.index.left->rType.str,
@@ -187,19 +187,16 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                 fprintf(c->dest, "]");
             }
             break;
-            case KEYWORD:
+        case KEYWORD:
                 fprintf(c->dest, "%s", node->node.word);
                 break;
-            case NEW:;
+        case NEW:;
             if(node->node.new.type.arrayLen != NULL) {
                 fprintf(c->dest, "(");
                 compile_type(&node->rType, c);
                 fprintf(c->dest, ")calloc(");
-                compile_node(node->rType.arrayLen, c);
-                fprintf(c->dest, ", sizeof(");
-
-                compile_type(&node->rType, c);
-                fprintf(c->dest, "))");
+                compile_node(node->node.new.type.arrayLen, c);
+                fprintf(c->dest, ", sizeof(%s))", node->rType.str);
             } else {
                 bool hasInit = false;
                 dict_find(node->rType.typeNode->node.structure.fields, "init",

@@ -71,6 +71,7 @@ string yank(void) {
 }
 SymType type(void) {
     SymType type;
+    memset(&type, 0, sizeof(SymType));
     type.str = yank();
     type.pointer = consume_if("*");
     print_type(type);

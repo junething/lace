@@ -72,8 +72,7 @@ int main(int argc, char **argv) {
     }
     compile2file(code, context);
     if(context->dest != stdout)
-        fclose(context->dest);
-    fclose(source);
+    fclose(context->dest);
     if (run) {
         int gccStatus;
         wait(&gccStatus);
