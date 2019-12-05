@@ -1,0 +1,15 @@
+class Person {
+	firstName: string
+	lastName: string
+	age: int
+	met to_string(self) -> string {
+		return self.firstName + " " + self.lastName
+	}
+}
+fun main (argc : int, argv : string*) -> int {
+	let person = new Person
+	person.firstName = "Rosa"
+	person.lastName = "Luxemburg"
+	printf ("Name: %s", person.to_string())
+	return 0
+}

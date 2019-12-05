@@ -15,12 +15,21 @@ CompileContext* resolve_code(TypedNode* code) {
     c->symbols = dict_new();
     c->functionDefs = dict_new();
     c->typeDefs = dict_new();
-    string primitives[] = { "int", "float", "char", "string", "bool", "void", (string)0 };
+    string primitives[] = { "int", "float", "char", "string", "bool", "void", "FILE", "size_t", "ssize_t", (string)0 };
+    //string primitivesC[] = { "int", "float", "char", "string", "bool", "void", (string)0 };
     for(int p = 0; primitives[p] != NULL; p++) {
         SymType* primitive = new (SymType);
         primitive->str = strdup(primitives[p]);
         dict_add(c->types, primitives[p], primitive);
     }
+    string functions[] = {"fopen", "fclose", "fputs", "getline", "puts", (string)0};
+    string functionTypes[] = {"FILE", "int", "int", "ssize_t", "int"};
+    for (int f = 0; functions[f] != NULL; f++) {
+        SymType* function = new (SymType);
+        function->type.ret = (SymType*)dict_find(c->types, functionTypes[f], NULL);
+        dict_add(c->symbols, functions[f], (void*)function);
+    }
+    
 
     Symbol* methodSymbol = new (Symbol);
     methodSymbol->type = *(SymType*)dict_find(c->types, "int", NULL);
@@ -87,13 +96,23 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
             if (!strcmp(node->node.word, "null")) {
                 node->rType = *((SymType*)dict_find_n(c->types, "void", NULL));
             } else {
+                bool found = false;
                 Symbol* word =
-                    (Symbol*)dict_find_n(c->symbols, node->node.word, NULL);
-                LOG("Got word %s and its type is %s (%d)", node->node.word,
-                    word->type.str, word->type.structy);
+                    (Symbol*)dict_find_n(c->symbols, node->node.word, &found);
+                if(found) {
+                    LOG("Got word %s and its type is %s (%d)", node->node.word,
+                        word->type.str, word->type.structy);
+                        node->rType = word->type;
+                } else {
+                     node->rType = *(SymType*)dict_find_n(c->types, node->node.word, NULL); 
+                }
                 // if (!found) ERROR("'%s' not found", node->node.word);
-                node->rType = word->type;
+                
             }
+            break;
+        case UNARY:
+            resolve_node(node->node.unary.operand, c);
+            node->rType = node->node.unary.operand->rType;
             break;
         case IND:
             resolve_node(node->node.index.left, c);
@@ -112,13 +131,15 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
             resolve_node(node->node.declare.value, c);
             if (node->node.declare.value != NULL)
                 node->rType = node->node.declare.value->rType;
-            else
-                node->rType = node->node.declare.type;
+            else {
+                node->rType = node->rType =
+                    *((SymType*)dict_find_n(c->types, node->node.declare.type.str, NULL));
+            }
             Symbol* sym = new (Symbol);
             sym->type = node->rType;
             dict_add(c->symbols, node->node.declare.name, (void*)sym);
-            LOG("Declaring that %s is a %s", node->node.declare.name,
-                sym->type.str)
+            LOG("Declaring that %s is a %s (%d)", node->node.declare.name,
+                sym->type.str, sym->type.structy)
             break;
         case IF:
         case WHILE:
@@ -136,11 +157,12 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
             TypedNode* field = (TypedNode*)dict_find(
                 structNode->fields, node->node.access.word, NULL);
             node->rType = field->rType;
-            LOG("something.%s is a %s", node->node.access.word,
-                node->rType.str);
+            LOG("something.%s is a %s (%d)", node->node.access.word,
+                node->rType.str, node->rType.structy);
             break;
         case MET_FUN: {
-            node->rType = node->node.method.type;
+            node->rType = *((SymType*)dict_find_n(
+                c->types, node->node.method.type.str, NULL));
             dict_add(c->functionDefs, node->node.method.name, &node->node);
             dict_new_division(c->symbols);
             for (int a = 0; a < node->node.method.numArgs; a++) {
@@ -148,7 +170,8 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
                     !strcmp(node->node.method.arguments[a].name, "self")) {
                     node->node.method.arguments[a].type =
                         c->currentParent->rType;
-                    node->node.method.arguments[a].type.pointer = true;
+                    if(c->currentParent->rType.structy == 1)
+                        node->node.method.arguments[a].type.pointer = true;
                     LOG("set a self type as %s*!", c->currentParent->rType.str);
                 }
                 Symbol* sym = new (Symbol);
@@ -168,8 +191,11 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
             break;
         } break;
         case NEW:
-            node->rType = *(SymType*)dict_find(c->types, node->node.word, NULL);
-            node->rType.pointer = true;
+            LOG("ugg: %s", node->node.new.type.str);
+            node->rType =
+                *(SymType*)dict_find(c->types, node->node.new.type.str, NULL);
+
+            if (node->rType.structy != 2) node->rType.pointer = true;
             break;
         case CALL:
             LOG("call!");
@@ -183,6 +209,7 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
                 // if (strcmp(node->node.call.arguments[a], c->)) {
             }
             break;
+        case CLASS:
         case UNION:
         case STRUCT:;
             SymType* type = new (SymType);
@@ -191,7 +218,8 @@ bool resolve_node(TypedNode* node, CompileContext* c) {
             //  ");
             // strcat(def, node->node.structure.name);
             type->str = node->node.structure.name;
-            type->structy = true;
+            type->structy = 1;
+            if (node->nType == CLASS) type->structy = 2;
             type->typeNode = node;
             dict_add(c->types, node->node.structure.name, type);
             dict_add(c->typeDefs, node->node.structure.name,

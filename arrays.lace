@@ -1,0 +1,4 @@
+fun main (argc : int, argv : string*) -> int {
+	let number = new int[5]
+	return 0
+}

@@ -1,0 +1,34 @@
+class File {
+	fileP: FILE*
+	fun open(path: string, access:string) -> File* {
+		let file = new File
+		file.fileP = fopen(path, access)
+		return file
+	}
+	met write(self, text: string) {
+		fputs(text, self.fileP)
+	}
+	met read_line(self) -> string {
+		let line : char* = null
+		let lineCap : size_t = 0
+		let size : ssize_t = getline(&line, &lineCap, self.fileP)
+		printf("size: %zd\n", size)
+		return line
+	}
+	met read(characters: int) -> string {
+
+	}
+}
+
+fun main (argc : int, argv : string*) -> int {
+	let file = File.open("classes.lace", "r")
+	let line = file.read_line()
+	printf("line: %s\n", line)
+	line = file.read_line()
+	printf("line: %s\n", line)
+	line = file.read_line()
+	printf("line: %s\n", line)
+	line = file.read_line()
+	printf("line: %s\n", line)
+	return 0
+}

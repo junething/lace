@@ -7,12 +7,17 @@
 #include "types.h"
 #include "utils.h"
 #include "resolve.h"
-string opStr[] = {"+", "-", "*", "/", "%", "=", "==", "!=", "x"};
+string opStr[] = {"+", "-", "*", "/", "%", "=", "==", "!=", "*", "&", "x", "x"};
+string opName[] = {"add", "sub", "mul", "mod", "ass", "equ", "neq", "ast", "amp", "-x-", "-x-"};
 int logVerbosity = 1;
 TypeStrings types;
 int indentation = 0;
 int main(int argc, char **argv) {
-    FILE *source = fopen(argv[1], "r");
+    if (argc < 2) ERROR("not enough args");
+    bool run = argc > 2 && !strcmp(argv[1], "run");
+    bool build = argc > 2 && !strcmp(argv[1], "build");
+    
+    FILE *source = fopen(argv[(run || build) ? 2 : 1], "r");
     ListNode *tokens = lex(source);
     fclose(source);
     ListNode *listNode = tokens;
@@ -25,17 +30,13 @@ int main(int argc, char **argv) {
     TypedNode *code = parse_lace(tokens);
     fprintf(stderr, "\nAST Nodes:\n");
     print_node(code);
-    fprintf(stderr, "\nAST Nodes:\n");
-    print_node(code);
     CompileContext* context = resolve_code(code);
     context->dest = stdout;
     //int devNull = open("/dev/null", O_WRONLY);
     int toGCC[2], fromGCC[2];
-    if (argc > 2 && !strcmp(argv[2], "-")) {
-
-    } else if (argc > 3 && !strcmp(argv[2], "-o")) {
+    if (argc > 3 && !strcmp(argv[2], "-o")) {
         context->dest = fopen(argv[3], "w");
-    } else {
+    } else if (build || run) {
         if (pipe(toGCC) || pipe(fromGCC)) {
             ERROR("Making pipes failed");
         }
@@ -48,7 +49,7 @@ int main(int argc, char **argv) {
             dup2(toGCC[0], 0);
             //dup2(fromGCC[1], 1);
             //dup2(fromGCC[1], 2);
-            char *args[] = { "gcc", "-xc", "-g", "-", (char *)0};
+            char *args[] = { "gcc", "-xc", "-g", "-", "-o", "lace.out", (char *)0};
             //char *args[] = { "cowsay", (char*)0 };
             execvp("gcc", args);
             LOG("Failed Exec");
@@ -68,12 +69,37 @@ int main(int argc, char **argv) {
           close(fromGCC[1]);
           close(toGCC[0]);
         }
-        }
-        compile2file(code, context);
+    }
+    compile2file(code, context);
+    if(context->dest != stdout)
         fclose(context->dest);
-        //fclose(toGCC);
+    fclose(source);
+    if (run) {
+        int gccStatus;
+        wait(&gccStatus);
+        if(gccStatus) {
+            ERROR("GCC compile error");
+        } else {
+            char *args[] = {"./lace.out", "", (char *)0};
+            // char *args[] = { "cowsay", (char*)0 };
+            execvp("./lace.out", args);
+            LOG("Failed Exec");
+        }
+    }
+    // fclose(toGCC);
 }
-
+void print_type(SymType type) {
+    //fprintf(stderr, "%s", (type.c != NULL) ? type.c : type.str);
+    //fprintf(stderr, "%s", type.str);
+    if (type.pointer) fputc('*', stderr);
+    if (type.structy == 2) fputc('*', stderr);
+    if(type.arrayLen != NULL) {
+        fprintf(stderr, "[");
+        print_node(type.arrayLen);
+        fprintf(stderr, "]");
+    }
+ //   return true;
+}
 void print_node(const TypedNode *node) {
     if (node == NULL) {
         //hold();
@@ -88,6 +114,10 @@ void print_node(const TypedNode *node) {
             fprintf(stderr, " %s ", opStr[node->node.binOp.op]);
             print_node(node->node.binOp.two);
             fprintf(stderr, ")");
+            break;
+        case UNARY:
+            fprintf(stderr, " %s", opStr[node->node.unary.op]);
+            print_node(node->node.unary.operand);
             break;
         case IND:
             print_node(node->node.index.left);
@@ -131,7 +161,9 @@ void print_node(const TypedNode *node) {
                 fprintf(stderr, "%s", node->node.word);
                 break;
             case NEW:
-                fprintf(stderr, "new %s", node->node.word);
+                fprintf(stderr, "new ");
+                print_type(node->node.new.type);
+                // print_node(node->node.node);
                 break;
             case LET:
                 fprintf(stderr, "let %s : %s", node->node.declare.name,
@@ -170,8 +202,9 @@ void print_node(const TypedNode *node) {
                 break;
             case STRUCT:
             case UNION:
+            case CLASS:
                 fprintf(stderr, "%s %s {\n",
-                        (node->nType == STRUCT) ? "struct" : "union",
+                        (node->nType == STRUCT) ? "struct" : (node->nType == CLASS) ? "class" : "union",
                         node->node.structure.name);
                 for (int a = 0; a < node->node.structure.fields->len; a++) {
                     TypedNode *subNode =

@@ -15,6 +15,7 @@ int dict_find_index(Dict* dict, const char* key) {
 }
 
 void* dict_find(Dict* dict, const char* key, bool *found) {
+    if(key == NULL) ERROR("Key NULL");
     int idx = dict_find_index(dict, key);
     if (idx != -1){
         if(found != NULL)
@@ -31,6 +32,7 @@ void* dict_find(Dict* dict, const char* key, bool *found) {
 }
 
 void* dict_find_n(Dict* dict, const char* key, bool *found) {
+    if(key == NULL) ERROR("Key NULL");
     for (int i = dict->len - 1; i >= 0; i--) {
         if (!strcmp(dict->array[i].key, key)) {
             if(found != NULL)

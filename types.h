@@ -32,7 +32,8 @@ typedef enum {
     WORD,
     KEYWORD,
     NEW,
-    CODE
+    CODE,
+    UNARY
 } TokType;
 typedef enum {
     ADD,
@@ -42,29 +43,37 @@ typedef enum {
     MOD,
     ASS,
     EQU,
-    NEQ
+    NEQ,
+    AST,
+    AMP
      /*, NEG, INV, AND, OR, NOR, XOR*/
 } OpType;
 struct TypedNode;
 typedef struct TypedNode TypedNode;
 struct Argument;
 typedef struct Argument Argument;
+struct SymType;
+typedef struct SymType SymType;
 typedef struct {
     string c;
+    SymType* ret;
     int numArgs;
     Argument* arguments;
 } Type;
-typedef struct {
+struct SymType {
     string str;
-    string base;
+    Type base;
     Type type;
-    bool structy;
+    int structy;
     TypedNode* typeNode;
     int pointer;
-    int array;
+    
+    TypedNode* arrayLen;
     bool fun;
     bool met;
-} SymType;
+    string c;
+    //  SymType* down;
+};
 
 typedef struct {
     SymType type;
@@ -79,6 +88,13 @@ typedef struct {
     TypedNode** arguments;
     int numArgs;
 } CallNode;
+typedef struct {
+    SymType type;
+} NewNode;
+typedef struct {
+    OpType op;
+    TypedNode* operand;
+} UnaryNode;
 typedef struct {
     TypedNode* one;
     OpType op;
@@ -154,6 +170,8 @@ typedef union {
     AccessNode access;
     IndexNode index;
     PrimativeNode primitive;
+    UnaryNode unary;
+    NewNode new;
     string word;
 } AnyNode;
 struct TypedNode {

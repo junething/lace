@@ -1,50 +1,25 @@
-struct ListNode {
-	value : int,
-	next : ListNode*
-}
-struct List {
-	start : ListNode*,
-	end : ListNode*,
-	met init(self : List* ) -> List* {
-		self.start = new ListNode
-		self.end = self.start
-		return self
-	},
-	met add(self : List*, value : int) {
-		self.end.next = new ListNode
-		self.end = self.end.next
-		self.end.value = value
-	},
-	def self[index : int] = value : int {
-		let node = self.start.next
-		let n = 0
-		while node != null {
-			if n == index {
-				node.value = value
-				return
-			}
-			node = node.next
-			n = n + 1
-		}
-	},
-	def self[index : int] -> int {
-		let node = self.start.next
-		let n = 0
-		while node != null {
-			if n == index {
-				return node.value
-			}
-			node = node.next
-			n = n + 1
-		}
-		return 0
+struct Vector {
+	x: float
+	y: float
+	z: float
+	def self + vec: Vector* -> Vector {
+		let result: Vector
+		result.x = self.x + vec.x
+		result.y = self.y + vec.y
+		result.z = self.z + vec.z
+		return result
 	}
-} 
+	def self - vec: Vector* -> Vector {
+		let result: Vector
+		result.x = self.x - vec.x
+		result.y = self.y - vec.y
+		result.z = self.z - vec.z
+		return result
+	}
+}
 fun main (argc : int, argv : string*) -> int {
-	let list = new List
-	list.add(78)
-	list.add(89)
-	list.add(68)
-	list[1] = 7
-	printf("%d", list[1])
+	let one : Vector
+	let two : Vector
+	let three = one + two
+	return 0
 }

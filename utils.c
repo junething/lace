@@ -15,6 +15,17 @@ bool valint(const string str, int *out)
     }
     return true;
 }
+bool valfloat(const string str, float *out) {
+    char *end;
+    double value = strtod(str, &end);
+    if (end == str || *end != '\0' || errno == ERANGE) {
+        return false;
+    }
+    if(out != NULL) {
+        *out = (float)value;
+    }
+    return true;
+}
 void log_lable(string file, int line) {
     fprintf(stderr, "\033[35;1m[%s:%d]\033[0m:\t", file, line);
 }

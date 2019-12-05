@@ -9,6 +9,12 @@
     fprintf(stderr, __VA_ARGS__);                                         \
     putc('\n', stderr);                                                   \
     error(1); }
+#define ERROR2(...)                                                            \
+    {                                                                         \
+        fprintf(stderr, "\033[31;1;4m[%s:%d]\033[0m:\t", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__);                                         \
+        error(1);                                                             \
+    }
 #define LOG(...)                   \
     if(logVerbosity > 0) {          \
         log_lable(__FILE__, __LINE__);  \

@@ -7,8 +7,9 @@
 #include "types.h"
 #include "utils.h"
 bool compile_type(SymType* type, CompileContext* c) {
-    fprintf(c->dest, "%s", type->str);
+    fprintf(c->dest, "%s", (type->c != NULL) ? type->c : type->str);
     if (type->pointer) fputc('*', c->dest);
+    if (type->structy == 2) fputc('*', c->dest);
     return true;
 }
 bool compile2file(TypedNode* code, CompileContext* c) {
@@ -29,8 +30,10 @@ bool compile2file(TypedNode* code, CompileContext* c) {
     for (int a = 0; a < c->typeDefs->len; a++) {
         StructNode* structure = ((StructNode*)c->typeDefs->array[a].value);
         fprintf(c->dest, "typedef %s %s %s;\n",
-                (structure->type == STRUCT) ? "struct" : "union",
-                structure->name, structure->name);
+                (structure->type == UNION) ? "union" : "struct",
+                structure->name,
+              //  (structure->type == CLASS) ? "*" : "",
+                structure->name);
     }
     // function and method declararions;
     for (int a = 0; a < c->functionDefs->len; a++) {
@@ -53,7 +56,7 @@ bool compile2file(TypedNode* code, CompileContext* c) {
     for (int a = 0; a < c->typeDefs->len; a++) {
         StructNode* structure = ((StructNode*)c->typeDefs->array[a].value);
         fprintf(c->dest, "%s %s {\n",
-                (structure->type == STRUCT) ? "struct" : "union",
+                (structure->type == UNION) ? "union" : "struct",
                 structure->name);
         for (int a = 0; a < structure->fields->len; a++) {
             TypedNode* subNode = (TypedNode*)structure->fields->array[a].value;
@@ -92,7 +95,8 @@ bool compile_node(TypedNode* node, CompileContext* c) {
     if (node == NULL) return false;
     switch (node->nType) {
         case BINOP:
-            // LOG("Type of one is %s", node->node.binOp.one->rType.str);
+            //LOG("Type of one is %s (%d)", node->node.binOp.one->rType.str,
+              //  node->node.binOp.one->rType.structy);
             if (node->node.binOp.op == ADD &&
                 node->node.binOp.one->rType.str != NULL &&
                 strcmp(node->node.binOp.one->rType.str, "string") == 0) {
@@ -107,6 +111,28 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                 // fprintf(c->dest, "(%d)\n", node->node.binOp.op);
                 compile_node(node->node.binOp.two, c);
                 fprintf(c->dest, ")");
+            } else if (node->node.binOp.one->rType.structy) {
+                char funcOpName[strlen(node->node.binOp.one->rType.str) + 6];
+                memset(funcOpName, 0, sizeof funcOpName);
+                strcat(funcOpName, node->node.binOp.one->rType.str);
+                strcat(funcOpName, "__");
+                strcat(funcOpName, opName[node->node.binOp.op]);
+
+                TypedNode* met = (TypedNode*)dict_find(
+                    node->node.binOp.one->rType.typeNode->node.structure.fields,
+                    opName[node->node.binOp.op], NULL);
+                if (met->nType == MET_FUN) {
+                    fprintf(c->dest, "%s__%s (",
+                            met->node.method.parent->node.structure.name,
+                            funcOpName);
+                    compile_node(node->node.binOp.one, c);
+                    // fprintf(c->dest, "(%d)\n", node->node.binOp.op);
+                    fprintf(c->dest, ", ");
+                    compile_node(node->node.binOp.two, c);
+                    fprintf(c->dest, ")");
+                } else {
+                    ERROR("afdasasdf");
+                }
             } else {
                 compile_node(node->node.binOp.one, c);
                 // fprintf(c->dest, "(%d)\n", node->node.binOp.op);
@@ -164,14 +190,31 @@ bool compile_node(TypedNode* node, CompileContext* c) {
             case KEYWORD:
                 fprintf(c->dest, "%s", node->node.word);
                 break;
-                case NEW:;
+            case NEW:;
+            if(node->node.new.type.arrayLen != NULL) {
+                fprintf(c->dest, "(");
+                compile_type(&node->rType, c);
+                fprintf(c->dest, ")calloc(");
+                compile_node(node->rType.arrayLen, c);
+                fprintf(c->dest, ", sizeof(");
+
+                compile_type(&node->rType, c);
+                fprintf(c->dest, "))");
+            } else {
                 bool hasInit = false;
-                dict_find(node->rType.typeNode->node.structure.fields, "init", &hasInit);
-                if(hasInit) {
-                    fprintf(c->dest, "%s__init(new (%s))", node->rType.str, node->rType.str);
+                dict_find(node->rType.typeNode->node.structure.fields, "init",
+                          &hasInit);
+                if (hasInit) {
+                    fprintf(c->dest, "%s__init(new (%s))", node->rType.str,
+                            node->rType.str);
                 } else {
-                   fprintf(c->dest, "new (%s)", node->rType.str); 
+                    fprintf(c->dest, "new (%s)", node->rType.str);
                 }
+            }
+            break;
+                case UNARY:
+                    fprintf(c->dest, "%s", opStr[node->node.unary.op]);
+                    compile_node(node->node.unary.operand, c);
                     break;
                 case DOT:
                     // Type* type = (Type*)dict_find(c->)
@@ -180,8 +223,10 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                         //      node->node.access.left->rType.str);
                         compile_node(node->node.access.left, c);
                         fprintf(c->dest, "%s",
-                                (node->node.access.left->rType.pointer) ? "->"
-                                                                        : ".");
+                                (node->node.access.left->rType.pointer ||
+                                 node->node.access.left->rType.structy == 2)
+                                    ? "->"
+                                    : ".");
                         fprintf(c->dest, "%s", node->node.access.word);
 
                         // if(node->node.access->rType)
@@ -236,21 +281,26 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                 if (call->method->nType == DOT) {
                     AccessNode* dot = &call->method->node.access;
                     if (dot->left->rType.structy) {
-                         TypedNode* met  = (TypedNode*)dict_find(
-                             dot->left->rType.typeNode->node.structure.fields,
-                             dot->word, NULL);
-                         if (met->nType == MET_FUN) {
-                             fprintf(
-                                 c->dest, "%s__%s (",
-                                 met->node.method.parent->node.structure.name,
-                                 call->method->node.access.word);
-                             compile_node(dot->left, c);
-                             fprintf(c->dest, ", ");
-                         } else {
-                             ERROR("afdasasdf");
-                         }
+                        TypedNode* met = (TypedNode*)dict_find(
+                            dot->left->rType.typeNode->node.structure.fields,
+                            dot->word, NULL);
+                        if (met->nType == MET_FUN) {
+                            fprintf(
+                                c->dest, "%s__%s (",
+                                met->node.method.parent->node.structure.name,
+                                call->method->node.access.word);
+                            if (!met->node.function.fun) {
+                                compile_node(dot->left, c);
+                                if (node->node.call.numArgs > 1)
+                                    fprintf(c->dest, ", ");
+                            }
+                        } else {
+                            ERROR("afdasasdf");
+                        }
                     } else {
-                        ERROR("cannot call on");
+                        ERROR2("cannot call on (%d): ", dot->left->nType);
+                        print_node(dot->left);
+                        
                     }
                 } else {
                     compile_node(node->node.call.method, c);
@@ -267,8 +317,8 @@ bool compile_node(TypedNode* node, CompileContext* c) {
                 break;
             case UNION:
             case STRUCT:
-                
-                break;
+            case CLASS:
+            break;
             default:
                 fflush(c->dest);
                 ERROR("%d not implemented (or forgot break)", node->nType);

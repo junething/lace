@@ -40,7 +40,7 @@ ListNode* lex(FILE* input) {
             buf[i++] = ch;
             continue;
         }
-        if (one_of(ch, "(){}[],:.*\n")) {
+        if (one_of(ch, "(){}[],:.*&\n")) {
             if (strlen(buf) > 0) add_token(&currentListNode, buf);
             memset(buf, 0, sizeof(buf));
             buf[0] = ch;

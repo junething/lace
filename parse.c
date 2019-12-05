@@ -14,7 +14,10 @@ bool wasNewline;
 TypedNode* expression(void);
 TypedNode* function_or_method (void);
 TypedNode* primary(void);
-bool check(string tok) { return (strcmp(tok, peek) == 0); }
+bool check(string tok) {
+    if (tok == NULL) return false;
+    return (strcmp(tok, peek) == 0);
+}
 void next(void) {
     if (tokenNode->next != NULL) {
         tokenNode = tokenNode->next;
@@ -35,6 +38,9 @@ void next(void) {
     
 }
 void consume(string tok) {
+    if(tok == NULL) {
+        return;
+    }
     if (strcmp(tok, peek) != 0) {
         hold();
         ERROR("Expected '%s'(%lu) got '%s'(%lu): %d", tok, strlen(tok), peek,
@@ -48,6 +54,7 @@ void discard(void) {
     free(peek);
     next();
 }
+
 bool consume_if(string tok) {
    // fprintf(stderr, "is '%s' == '%s'", peek, tok);
     if (check(tok)) {
@@ -61,6 +68,19 @@ string yank(void) {
     string p = peek;
     next();
     return p;
+}
+SymType type(void) {
+    SymType type;
+    type.str = yank();
+    type.pointer = consume_if("*");
+    print_type(type);
+    if(consume_if("[")) {
+        type.arrayLen = expression();
+        consume("]");
+    }
+    LOG("TYPE:");
+    print_type(type);
+    return type;
 }
 ListNode* code_list(void) {
     ListNode* code = new (ListNode);
@@ -90,26 +110,31 @@ TypedNode* parse_lace(ListNode* tokens) {
 
 TypedNode* word(void) {
     TypedNode* node = new (TypedNode);
-    if (check(",") || check("}")) ERROR("stray '%s'! on line %d", peek, line);
+    if (check(",") || check("}") || check("(")) ERROR("stray '%s'! on line %d", peek, line);
     if (consume_if("new")) {
         node->nType = NEW;
-        
+        node->node.new.type = type();
     } else {
         node->nType = WORD;
+         node->node.word = yank();
      //   LOG("Making a word:");
     }
     
-    node->node.word = yank();
+   
     //print_node(node);
     return node;
 }
 TypedNode* value(void) {
     int num;
+    float floatNum;
     TypedNode* node = new (TypedNode);
     node->nType = PRIMATIVE;
     if (valint(peek, &num)) {
         node->pType = INT;
         node->node.primitive.integer = num;
+    } else if (valfloat(peek, &floatNum)) {
+        node->pType = FLOAT;
+        node->node.primitive.string = peek;
     } else if (peek[0] == '\"') {
         string old = peek;
         peek = &old[1];
@@ -200,8 +225,21 @@ TypedNode* primary(void) {
     ERROR("Should not be here");
     return NULL;
 }
+TypedNode* unary(void) {
+    while (true) {
+        if (consume_if("&")) {
+            TypedNode* unary = new (TypedNode);
+            unary->nType = UNARY;
+            unary->node.unary.op = AMP;
+            unary->node.unary.operand = primary();
+            return unary;
+        } else {
+            return primary();
+        }
+    }
+}
 TypedNode* multiplicative(void) {
-    TypedNode* left = primary();
+    TypedNode* left = unary();
     while (true) {
         if (!strcmp(peek, "*") || !strcmp(peek, "*") || !strcmp(peek, "%")) {
             // string op = peek;
@@ -210,7 +248,7 @@ TypedNode* multiplicative(void) {
             newLeft->nType = BINOP;
             newLeft->node.binOp.one = left;
             newLeft->node.binOp.op = (peek[0] == '*') ? MUL : ((peek[0] == '-') ? SUB : MOD);
-            newLeft->node.binOp.two = primary();
+            newLeft->node.binOp.two = unary();
             fprintf(stderr, "BinOp: ");
             print_node(newLeft);
             fprintf(stderr, "\n");
@@ -299,6 +337,7 @@ TypedNode* statement(void) {
         newLeft->node.declare.name = yank();
         if(consume_if(":")) {
            newLeft->node.declare.type.str = yank();
+           newLeft->node.declare.type.pointer = consume_if("*");
         }
         if(consume_if("=")) {
         newLeft->node.declare.value = expression();
@@ -312,9 +351,7 @@ TypedNode* statement(void) {
         ifNode->nType = (check("if")) ? IF : WHILE;
         next();
         ifNode->node.ifOrWhile.condition = expression();
-        consume("{");
-        ifNode->node.ifOrWhile.body = code();
-        consume("}");
+        ifNode->node.ifOrWhile.body = statement();
         return ifNode;
     } else if (consume_if("return")) {
         TypedNode* ret = new (TypedNode);
@@ -322,18 +359,19 @@ TypedNode* statement(void) {
         if(!wasNewline)
             ret->node.node = expression();
         return ret;
-    } else if (check("struct") || check("union")) {
+    } else if (check("struct") || check("union") || check("class") || check("trait")) {
         bool isUnion = !strcmp(peek, "union");
+        bool isClass = !strcmp(peek, "class");
         next();
         TypedNode* struc = new(TypedNode);
-        struc->nType = (isUnion) ? UNION : STRUCT;
+        struc->nType = (isUnion) ? UNION : (isClass) ? CLASS : STRUCT;
         struc->node.structure.type = struc->nType;
         struc->node.structure.name = yank();
         consume("{");
         struc->node.structure.fields = dict_new();
         int a = 0;
         while (!consume_if(")")) {
-            if(check("met") || check("def")) {
+            if(check("met") || check("fun") || check("def")) {
                     TypedNode* method = function_or_method();
                     method->node.method.parent = struc;
                     dict_add(struc->node.structure.fields,
@@ -343,13 +381,11 @@ TypedNode* statement(void) {
                 dec->nType = LET;
                 dec->node.declare.name = yank();
                 consume(":");
-                dec->node.declare.type.str = yank();
-                dec->node.declare.type.pointer = consume_if("*");
-                dict_add(struc->node.structure.fields, dec->node.declare.name,
-                         dec);
+                dec->node.declare.type = type();
+                dict_add(struc->node.structure.fields, dec->node.declare.name, dec);
             }
             a++;
-            if (!consume_if(",")) break;
+            if (!consume_if(",") && !wasNewline) break;
             if (check("}")) break;
             
         }
@@ -357,6 +393,10 @@ TypedNode* statement(void) {
         consume("}");
         print_node(struc);
         return struc;
+    } else if (consume_if("{")) {
+        TypedNode* codeNode = code();
+        consume("}");
+        return codeNode;
     } else {
         TypedNode* node = expression();
         node->statement = true;
@@ -373,20 +413,53 @@ TypedNode* start(void) {
 
 TypedNode* function_or_method (void) {
     bool def = check("def");
-    string open = (def) ? "[" : "(";
-    string close = (def) ? "]" : ")";
+    string close = NULL;  
     TypedNode* funNode = new (TypedNode);
     funNode->nType = MET_FUN;
     funNode->node.method.fun = (peek[0] == 'f') ? true : false;
     next();
    
     if(def) {
-            funNode->node.method.name = "index_get";
+        
         consume("self");
     } else {
         funNode->node.method.name = yank();
     }
-    consume(open);
+    string operator = yank();
+    if(!strcmp(operator, "(")) {
+        close = ")";
+    } else if(!strcmp(operator, "[")) {
+        funNode->node.method.name = "index_get";
+        close = "]";
+    } else if(0 < strlen(operator) && strlen(operator) < 3) {
+        funNode->node.method.name = (string)calloc(1, sizeof(char) * ((strlen(operator) == 2 && operator[1] == '=') ? 11 : 4));
+        switch (operator[0]) {
+            case '+':
+                strcat(funNode->node.method.name, "add");
+                break;
+            case '-':
+                strcat(funNode->node.method.name, "sub");
+                break;
+            case '*':
+                strcat(funNode->node.method.name, "mul");
+                break;
+            case '/':
+                strcat(funNode->node.method.name, "div");
+                break;
+            case '%':
+                strcat(funNode->node.method.name, "mod");
+                break;
+                
+            default:
+                ERROR("not supported");
+                break;
+        }
+        if(strlen(operator) == 2 && operator[1] == '=')
+            strcat(funNode->node.method.name, "_equals");
+        close = NULL;
+    } else {
+        ERROR("afsd");
+    }
     Argument* args = (Argument*)calloc(1, sizeof(Argument) * 5);
     int count = 5;
     int a = 0;
